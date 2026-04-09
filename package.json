@@ -2,6 +2,6 @@
   "name": "urban3d-simulator",
   "version": "1.0.0",
   "scripts": {
-    "dev": "npx http-server . -p 3000 -o urban3d.html --cors"
+    "dev": "npx http-server . -p 3000 -o index.html --cors"
   }
 }
