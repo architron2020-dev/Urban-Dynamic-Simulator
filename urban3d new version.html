@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+
+
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Urban 3D Simulator</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;600;700;800&display=swap');
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07090f;--s1:#0d1017;--s2:#131720;--s3:#1a1f2e;
+  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.11);
+  --text:#dde2f0;--muted:#5a6278;--dim:#3a4058;
+  --accent:#4f9eff;--green:#2dffaa;--amber:#ffb340;--red:#ff4f6a;--purple:#b06aff;
+  --mono:'DM Mono',monospace;--head:'Syne',sans-serif;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--mono);font-size:12px}
+
+/* LAYOUT */
+#app{display:grid;grid-template-rows:44px 1fr 90px;grid-template-columns:260px 1fr 220px;height:100vh;gap:0}
+#topbar{grid-column:1/-1;display:flex;align-items:center;gap:0;border-bottom:1px solid var(--border);background:var(--s1);padding:0 14px;gap:12px}
+#left{grid-row:2;grid-column:1;border-right:1px solid var(--border);background:var(--s1);overflow-y:auto;display:flex;flex-direction:column}
+#viewport{grid-row:2;grid-column:2;position:relative;overflow:hidden;background:#000}
+#right{grid-row:2;grid-column:3;border-left:1px solid var(--border);background:var(--s1);overflow-y:auto;display:flex;flex-direction:column}
+#bottombar{grid-column:1/-1;border-top:1px solid var(--border);background:var(--s1);display:flex;align-items:center;gap:0;padding:0;overflow-x:auto}
+
+/* TOPBAR */
+.app-title{font-family:var(--head);font-size:13px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text)}
+.app-title span{color:var(--accent)}
+.top-sep{width:1px;height:20px;background:var(--border);margin:0 4px}
+.top-pill{display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;border:1px solid var(--border);background:var(--s2);font-size:10px;color:var(--muted);white-space:nowrap}
+.top-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.blink{animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.25}}
+.top-actions{margin-left:auto;display:flex;gap:6px}
+.tbtn{padding:5px 12px;border-radius:5px;border:1px solid var(--border2);background:transparent;color:var(--text);font-family:var(--mono);font-size:10px;cursor:pointer;letter-spacing:0.04em;transition:all 0.15s}
+.tbtn:hover{background:var(--s3);border-color:var(--accent);color:var(--accent)}
+.tbtn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.tbtn.primary:hover{opacity:0.85}
+
+/* PANELS */
+.psec{padding:11px 12px;border-bottom:1px solid var(--border)}
+.plabel{font-size:9px;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+.plabel-badge{font-size:8px;padding:2px 6px;border-radius:10px;background:var(--s3);color:var(--accent);letter-spacing:0.08em}
+
+/* LOCATION */
+.loc-row{display:flex;gap:5px}
+.loc-in{flex:1;background:var(--s2);border:1px solid var(--border2);border-radius:5px;padding:6px 9px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none;transition:border-color 0.15s}
+.loc-in:focus{border-color:var(--accent)}
+.loc-go{background:var(--accent);border:none;border-radius:5px;padding:6px 10px;color:#fff;font-family:var(--head);font-size:10px;font-weight:600;cursor:pointer;letter-spacing:0.05em;white-space:nowrap;transition:opacity 0.15s}
+.loc-go:hover{opacity:0.85}
+.loc-go:disabled{opacity:0.35;cursor:not-allowed}
+
+/* CLIMATE GRID */
+.cg{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:8px}
+.cc{background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:7px 9px}
+.cc-label{font-size:8px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.cc-val{font-size:14px;font-weight:500;font-family:var(--head)}
+.cc-val.hot{color:var(--amber)}
+.cc-val.cold{color:#88ccff}
+.cc-val.bad{color:var(--red)}
+.cc-val.ok{color:var(--green)}
+.cc-sub{font-size:9px;color:var(--muted);margin-top:1px}
+
+/* SCENARIOS */
+.scene-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.sbtn{padding:8px 6px;border-radius:6px;border:1px solid var(--border2);background:var(--s2);color:var(--muted);font-family:var(--mono);font-size:10px;cursor:pointer;text-align:center;transition:all 0.15s;line-height:1.4}
+.sbtn:hover{color:var(--text)}
+.sbtn.active{background:rgba(79,158,255,0.12);border-color:var(--accent);color:var(--accent)}
+.sbtn .sicon{font-size:16px;display:block;margin-bottom:3px}
+
+/* SLIDERS */
+.sl-row{margin-bottom:9px}
+.sl-head{display:flex;justify-content:space-between;margin-bottom:4px}
+.sl-name{font-size:10px;color:var(--muted)}
+.sl-val{font-size:10px;color:var(--text);font-weight:500}
+input[type=range]{width:100%;height:2px;-webkit-appearance:none;background:var(--border2);border-radius:1px;outline:none;cursor:pointer;accent-color:var(--accent)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--accent);cursor:pointer;border:2px solid var(--s1)}
+
+/* LAYER TOGGLES */
+.litem{display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border-radius:5px;background:var(--s2);border:1px solid var(--border);cursor:pointer;margin-bottom:4px;transition:all 0.15s}
+.litem.on{border-color:var(--border2)}
+.litem-l{display:flex;align-items:center;gap:7px}
+.ldot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.lname{font-size:10px;color:var(--muted)}
+.litem.on .lname{color:var(--text)}
+.tog{width:28px;height:15px;border-radius:8px;background:var(--border2);position:relative;transition:background 0.15s;flex-shrink:0}
+.tog::after{content:'';position:absolute;top:2.5px;left:2.5px;width:10px;height:10px;border-radius:50%;background:var(--dim);transition:all 0.15s}
+.litem.on .tog{background:var(--accent)}
+.litem.on .tog::after{left:15.5px;background:#fff}
+
+/* SCORES (right panel) */
+.score-block{padding:10px 12px;border-bottom:1px solid var(--border)}
+.score-title{font-family:var(--head);font-size:9px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+.sitem{margin-bottom:10px}
+.sitem-head{display:flex;justify-content:space-between;margin-bottom:4px}
+.sitem-label{font-size:10px;color:var(--muted)}
+.sitem-val{font-size:10px;font-weight:500}
+.strack{height:3px;background:var(--border);border-radius:2px;overflow:hidden}
+.sfill{height:100%;border-radius:2px;transition:width 0.6s ease}
+
+.verdict-box{margin:8px 0;padding:8px 10px;border-radius:6px;border:1px solid;font-size:10px;line-height:1.6}
+.verdict-box.good{border-color:rgba(45,255,170,0.3);color:var(--green);background:rgba(45,255,170,0.05)}
+.verdict-box.warn{border-color:rgba(255,179,64,0.3);color:var(--amber);background:rgba(255,179,64,0.05)}
+.verdict-box.bad{border-color:rgba(255,79,106,0.3);color:var(--red);background:rgba(255,79,106,0.05)}
+
+.insight-text{font-size:10px;color:var(--muted);line-height:1.7;padding:10px 12px}
+
+/* BOTTOM BAR — metric strip */
+.bmetric{flex:1;min-width:110px;padding:0 14px;border-right:1px solid var(--border);display:flex;flex-direction:column;justify-content:center;gap:2px}
+.bmetric:last-child{border-right:none}
+.bm-label{font-size:8px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted)}
+.bm-val{font-family:var(--head);font-size:22px;font-weight:700;line-height:1}
+.bm-sub{font-size:8px;color:var(--muted)}
+.bm-bar{height:2px;background:var(--border);border-radius:1px;margin-top:3px;overflow:hidden;width:100%}
+.bm-fill{height:100%;border-radius:1px;transition:width 0.7s ease}
+
+/* VIEWPORT OVERLAYS */
+#hud-overlay{position:absolute;top:10px;left:10px;z-index:10;display:flex;flex-direction:column;gap:5px;pointer-events:none}
+.hud-chip{background:rgba(7,9,15,0.82);border:1px solid var(--border2);border-radius:20px;padding:4px 11px;font-size:9px;letter-spacing:0.07em;display:flex;align-items:center;gap:6px;backdrop-filter:blur(4px)}
+.hchip-dot{width:6px;height:6px;border-radius:50%}
+
+#ctrl-overlay{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);z-index:10;display:flex;gap:6px}
+.ctrl-btn{padding:5px 12px;border-radius:20px;border:1px solid var(--border2);background:rgba(7,9,15,0.8);color:var(--text);font-family:var(--mono);font-size:10px;cursor:pointer;backdrop-filter:blur(4px);transition:all 0.15s;letter-spacing:0.04em}
+.ctrl-btn:hover{border-color:var(--accent);color:var(--accent)}
+.ctrl-btn.active{background:rgba(79,158,255,0.15);border-color:var(--accent);color:var(--accent)}
+
+#weather-canvas{position:absolute;inset:0;pointer-events:none;z-index:5}
+
+/* LOADING */
+#loading{position:absolute;inset:0;background:var(--bg);z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;transition:opacity 0.5s}
+#loading.gone{opacity:0;pointer-events:none}
+.ld-title{font-family:var(--head);font-size:14px;font-weight:700;letter-spacing:0.12em;color:var(--accent)}
+.ld-bar{width:200px;height:2px;background:var(--border);border-radius:1px;overflow:hidden}
+.ld-prog{height:100%;background:var(--accent);border-radius:1px;animation:ldprog 1.5s ease forwards}
+@keyframes ldprog{from{width:0}to{width:100%}}
+.ld-sub{font-size:10px;color:var(--muted);letter-spacing:0.06em}
+
+/* NOTIF */
+#notif{position:fixed;bottom:20px;right:20px;background:var(--s2);border:1px solid var(--accent);border-radius:8px;padding:10px 14px;font-size:11px;z-index:200;transform:translateY(50px);opacity:0;transition:all 0.3s;pointer-events:none;max-width:220px}
+#notif.show{transform:translateY(0);opacity:1}
+.ntitle{font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:3px}
+
+canvas{display:block}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- TOPBAR -->
+<div id="topbar">
+  <span class="app-title">Urban<span>3D</span> Sim</span>
+  <div class="top-sep"></div>
+  <div class="top-pill"><div class="top-dot blink" style="background:var(--green)"></div><span id="tp-loc">No location</span></div>
+  <div class="top-pill"><div class="top-dot" style="background:var(--amber)"></div><span id="tp-temp">—°C</span></div>
+  <div class="top-pill"><div class="top-dot" style="background:var(--accent)"></div><span id="tp-cond">—</span></div>
+  <div class="top-pill" id="tp-time-pill"><div class="top-dot" style="background:var(--purple)"></div><span id="tp-time">—</span></div>
+  <div class="top-actions">
+    <button class="tbtn" onclick="exportFrame()">Export PNG</button>
+    <button class="tbtn primary" onclick="triggerAnalysis()">Analyse ↗</button>
+  </div>
+</div>
+
+<!-- LEFT PANEL -->
+<div id="left">
+  <!-- Location -->
+  <div class="psec">
+    <div class="plabel">Location <span class="plabel-badge">Live API</span></div>
+    <div class="loc-row">
+      <input class="loc-in" id="loc-in" placeholder="City or address…" type="text">
+      <button class="loc-go" id="loc-go">Fetch</button>
+    </div>
+    <button class="tbtn" style="width:100%;margin-top:5px;font-size:10px" id="gps-btn">Use GPS</button>
+  </div>
+
+  <!-- Climate data -->
+  <div class="psec" id="climate-sec" style="display:none">
+    <div class="plabel">Realtime climate</div>
+    <div class="cg" id="climate-grid"></div>
+  </div>
+
+  <!-- Scenarios -->
+  <div class="psec">
+    <div class="plabel">Urban scenario</div>
+    <div class="scene-grid" id="scene-grid">
+      <button class="sbtn active" data-scene="base"><span class="sicon">🏙</span>Base state</button>
+      <button class="sbtn" data-scene="flyover"><span class="sicon">🌉</span>Flyover</button>
+      <button class="sbtn" data-scene="brt"><span class="sicon">🚌</span>BRT lane</button>
+      <button class="sbtn" data-scene="metro"><span class="sicon">🚇</span>Metro</button>
+      <button class="sbtn" data-scene="park"><span class="sicon">🌳</span>Green buffer</button>
+      <button class="sbtn" data-scene="highrise"><span class="sicon">🏢</span>High-rise</button>
+    </div>
+  </div>
+
+  <!-- Sliders -->
+  <div class="psec">
+    <div class="plabel">Manual controls</div>
+    <div id="slider-container"></div>
+  </div>
+
+  <!-- Layers -->
+  <div class="psec">
+    <div class="plabel">Analysis layers</div>
+    <div id="layer-container"></div>
+  </div>
+</div>
+
+<!-- VIEWPORT -->
+<div id="viewport">
+  <div id="loading">
+    <div class="ld-title">Initialising 3D engine</div>
+    <div class="ld-bar"><div class="ld-prog"></div></div>
+    <div class="ld-sub">Loading Three.js · Building city mesh</div>
+  </div>
+
+  <canvas id="weather-canvas"></canvas>
+
+  <div id="hud-overlay">
+    <div class="hud-chip"><div class="hchip-dot blink" style="background:var(--green)"></div><span id="hud-loc">Upload location for live data</span></div>
+    <div class="hud-chip"><div class="hchip-dot" style="background:var(--amber)"></div><span id="hud-wx">—</span></div>
+    <div class="hud-chip"><div class="hchip-dot" style="background:var(--accent)"></div><span id="hud-scene">BASE STATE</span></div>
+  </div>
+
+  <div id="ctrl-overlay">
+    <button class="ctrl-btn active" id="cb-rotate">Auto-rotate</button>
+    <button class="ctrl-btn" id="cb-top">Top view</button>
+    <button class="ctrl-btn" id="cb-street">Street level</button>
+    <button class="ctrl-btn" id="cb-iso">Isometric</button>
+    <button class="ctrl-btn" id="cb-night">Night mode</button>
+  </div>
+</div>
+
+<!-- RIGHT PANEL -->
+<div id="right">
+  <div class="score-block">
+    <div class="score-title">Live scores</div>
+    <div id="score-container"></div>
+    <div class="verdict-box warn" id="verdict-box">Run a scenario to see verdict.</div>
+  </div>
+  <div class="score-block">
+    <div class="score-title">Layer legend</div>
+    <div id="legend-container" style="font-size:10px;color:var(--muted);line-height:1.8"></div>
+  </div>
+  <div class="insight-text" id="insight-text">
+    Set a location for live climate data. Select a scenario. Toggle analysis layers to see environmental overlays in 3D.
+  </div>
+</div>
+
+<!-- BOTTOM BAR -->
+<div id="bottombar">
+  <div class="bmetric"><div class="bm-label">Walkability</div><div class="bm-val" id="bv-walk" style="color:var(--green)">—</div><div class="bm-bar"><div class="bm-fill" id="bf-walk" style="background:var(--green)"></div></div></div>
+  <div class="bmetric"><div class="bm-label">Thermal stress</div><div class="bm-val" id="bv-heat" style="color:var(--amber)">—</div><div class="bm-bar"><div class="bm-fill" id="bf-heat" style="background:var(--amber)"></div></div></div>
+  <div class="bmetric"><div class="bm-label">Air quality index</div><div class="bm-val" id="bv-air" style="color:var(--red)">—</div><div class="bm-bar"><div class="bm-fill" id="bf-air" style="background:var(--red)"></div></div></div>
+  <div class="bmetric"><div class="bm-label">Solar access</div><div class="bm-val" id="bv-solar" style="color:var(--amber)">—</div><div class="bm-bar"><div class="bm-fill" id="bf-solar" style="background:var(--amber)"></div></div></div>
+  <div class="bmetric"><div class="bm-label">Noise level</div><div class="bm-val" id="bv-noise" style="color:var(--purple)">—</div><div class="bm-bar"><div class="bm-fill" id="bf-noise" style="background:var(--purple)"></div></div></div>
+  <div class="bmetric"><div class="bm-label">Pedestrian comfort</div><div class="bm-val" id="bv-comfort" style="color:var(--accent)">—</div><div class="bm-bar"><div class="bm-fill" id="bf-comfort" style="background:var(--accent)"></div></div></div>
+</div>
+</div>
+
+<div id="notif"><div class="ntitle" id="ntitle"></div><div id="nbody"></div></div>
+
+<!-- THREE.JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let climate = null;
+let scene3d = 'base';
+let nightMode = false;
+let autoRotate = true;
+let viewMode = 'orbit';
+let layers = { heat:false, traffic:true, isovist:false, daylight:false, air:false, space:false, noise:false, access:false };
+let manual = { traffic:60, temp:28, time:70, humidity:55, wind:12, floors:5 };
+
+const layerDefs = [
+  {id:'traffic', name:'Traffic flow',    color:'#ff4f6a'},
+  {id:'heat',    name:'Heat island',     color:'#ffb340'},
+  {id:'isovist', name:'Isovist field',   color:'#4f9eff'},
+  {id:'daylight',name:'Daylight/shadow', color:'#ffd070'},
+  {id:'air',     name:'Air quality',     color:'#2dffaa'},
+  {id:'space',   name:'Space syntax',    color:'#b06aff'},
+  {id:'noise',   name:'Noise rings',     color:'#f0997b'},
+  {id:'access',  name:'Accessibility',   color:'#3dffa0'},
+];
+
+// ─── SLIDERS ─────────────────────────────────────────────────────────────────
+const sliderDefs = [
+  {id:'traffic',label:'Traffic density',min:0,max:100,unit:'%',fmt:v=>v+'%'},
+  {id:'temp',   label:'Temperature',    min:0,max:50, unit:'°C',fmt:v=>v+'°C'},
+  {id:'time',   label:'Time of day',    min:0,max:143,unit:'',fmt:v=>{const m=v*10,h=Math.floor(m/60)%24,mn=m%60;return(h<10?'0'+h:h)+':'+(mn<10?'0'+mn:mn)}},
+  {id:'floors', label:'Building floors',min:1,max:25, unit:'fl',fmt:v=>v+' fl'},
+  {id:'humidity',label:'Humidity',      min:0,max:100,unit:'%',fmt:v=>v+'%'},
+  {id:'wind',   label:'Wind speed',     min:0,max:80, unit:'km/h',fmt:v=>v+' km/h'},
+];
+const sc = document.getElementById('slider-container');
+sliderDefs.forEach(s=>{
+  const d=document.createElement('div'); d.className='sl-row';
+  d.innerHTML=`<div class="sl-head"><span class="sl-name">${s.label}</span><span class="sl-val" id="sv-${s.id}">${s.fmt(manual[s.id])}</span></div><input type="range" min="${s.min}" max="${s.max}" value="${manual[s.id]}" id="sr-${s.id}" step="1">`;
+  sc.appendChild(d);
+  d.querySelector('input').addEventListener('input',e=>{
+    manual[s.id]=+e.target.value;
+    document.getElementById('sv-'+s.id).textContent=s.fmt(manual[s.id]);
+    if(s.id==='floors') rebuildCity();
+    if(s.id==='time') updateSunLight();
+    updateScores(); updateInsights(); updateWeatherCanvas();
+  });
+});
+
+// ─── LAYERS ──────────────────────────────────────────────────────────────────
+const lc = document.getElementById('layer-container');
+layerDefs.forEach(l=>{
+  const el=document.createElement('div'); el.className='litem'+(l.on?' on':''); el.dataset.id=l.id;
+  el.innerHTML=`<div class="litem-l"><div class="ldot" style="background:${l.color}"></div><span class="lname">${l.name}</span></div><div class="tog"></div>`;
+  el.addEventListener('click',()=>{
+    layers[l.id]=!layers[l.id]; el.classList.toggle('on',layers[l.id]);
+    updateLayerMeshes(); updateInsights();
+  });
+  lc.appendChild(el);
+});
+
+// ─── RIGHT PANEL SCORES ───────────────────────────────────────────────────────
+const scoreDefs=[
+  {id:'walk', label:'Walkability',        color:'var(--green)'},
+  {id:'heat', label:'Thermal stress',     color:'var(--amber)'},
+  {id:'air',  label:'Air quality index',  color:'var(--red)'},
+  {id:'solar',label:'Solar access',       color:'var(--amber)'},
+  {id:'noise',label:'Noise level',        color:'var(--purple)'},
+];
+const scon=document.getElementById('score-container');
+scoreDefs.forEach(s=>{
+  const d=document.createElement('div'); d.className='sitem';
+  d.innerHTML=`<div class="sitem-head"><span class="sitem-label">${s.label}</span><span class="sitem-val" id="rs-${s.id}" style="color:${s.color}">—</span></div><div class="strack"><div class="sfill" id="rf-${s.id}" style="background:${s.color};width:0%"></div></div>`;
+  scon.appendChild(d);
+});
+
+function calcScores(){
+  const t=manual.traffic, temp=getTemp(), h=manual.humidity, fl=manual.floors;
+  const isFly=scene3d==='flyover',isBRT=scene3d==='brt',isGreen=scene3d==='park',isMet=scene3d==='metro',isHigh=scene3d==='highrise';
+  let walk=Math.round(80-t*0.38+(isGreen?22:0)+(isBRT?14:0)-(isFly?22:0)+(isMet?8:0)-(fl*0.8));
+  let heat=Math.round(25+(temp-10)*1.3+h*0.12-(isGreen?22:0)-(isBRT?5:0));
+  let air= Math.round(15+t*0.72-(isBRT?18:0)-(isGreen?14:0)-(isMet?5:0));
+  let solar=Math.round(90-(isHigh?38:0)-(isFly?28:0)-(fl*1.2));
+  let noise=Math.round(20+t*0.65-(isGreen?18:0)-(isMet?8:0));
+  let comfort=Math.round(walk*0.4+(100-heat)*0.3+(100-noise)*0.3);
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  return{walk:clamp(walk,5,99),heat:clamp(heat,5,99),air:clamp(air,5,99),solar:clamp(solar,5,99),noise:clamp(noise,5,99),comfort:clamp(comfort,5,99)};
+}
+
+function updateScores(){
+  const s=calcScores();
+  ['walk','heat','air','solar','noise'].forEach(id=>{
+    const v=s[id];
+    const el=document.getElementById('rs-'+id); if(el){el.textContent=v;}
+    const fl=document.getElementById('rf-'+id); if(fl){fl.style.width=v+'%';}
+  });
+  // bottom bar
+  const bmap={walk:'walk',heat:'heat',air:'air',solar:'solar',noise:'noise',comfort:'comfort'};
+  Object.entries({walk:s.walk,heat:s.heat,air:s.air,solar:s.solar,noise:s.noise,comfort:s.comfort}).forEach(([k,v])=>{
+    const bv=document.getElementById('bv-'+k); if(bv) bv.textContent=v;
+    const bf=document.getElementById('bf-'+k); if(bf) bf.style.width=v+'%';
+  });
+
+  const sceneLabels={base:'Base state',flyover:'Flyover bridge',brt:'BRT transit',metro:'Metro underpass',park:'Green buffer',highrise:'High-rise rezoned'};
+  const verdicts={
+    flyover:s.walk<50?{cls:'bad',t:'Flyover degrades walkability and solar access significantly.'}:{cls:'warn',t:'Flyover aids flow but reduces pedestrian comfort.'},
+    brt:{cls:'good',t:'BRT lane reduces emissions and improves walkability.'},
+    park:{cls:'good',t:'Green buffer cuts heat island and noise effectively.'},
+    metro:s.air>60?{cls:'warn',t:'Metro helps transit but traffic still high — demand management needed.'}:{cls:'good',t:'Metro underpass reduces surface congestion effectively.'},
+    highrise:{cls:'warn',t:'High-rise rezoning reduces solar access. Review daylight rights.'},
+    base:s.air>60?{cls:'bad',t:'High congestion and pollution. Intervention recommended.'}:{cls:'warn',t:'Moderate stress. Minor interventions recommended.'},
+  };
+  const v=verdicts[scene3d]||verdicts.base;
+  const vb=document.getElementById('verdict-box');
+  if(vb){vb.className='verdict-box '+v.cls; vb.textContent=v.t;}
+}
+
+function updateInsights(){
+  const s=calcScores();
+  const loc=climate?climate.label:'No location set';
+  const temp=getTemp();
+  const cond=climate?climate.cond:'Manual';
+  document.getElementById('insight-text').innerHTML=`
+    <b style="color:var(--accent)">${loc}</b><br>
+    ${temp}°C · ${cond} · Traffic ${manual.traffic}%<br><br>
+    Walk <b style="color:var(--green)">${s.walk}</b> · Heat <b style="color:var(--amber)">${s.heat}</b> · Air <b style="color:var(--red)">${s.air}</b><br>
+    Solar <b style="color:#ffd070">${s.solar}</b> · Noise <b style="color:var(--purple)">${s.noise}</b><br><br>
+    <span style="color:var(--muted)">Toggle layers to visualise overlays in 3D. Use scenario buttons to compare interventions.</span>
+  `;
+  // legend
+  const active=layerDefs.filter(l=>layers[l.id]);
+  document.getElementById('legend-container').innerHTML=active.length?active.map(l=>`<div style="display:flex;align-items:center;gap:6px"><div style="width:8px;height:8px;border-radius:50%;background:${l.color};flex-shrink:0"></div>${l.name}</div>`).join(''):'<span style="color:var(--muted)">No layers active</span>';
+}
+
+// ─── CLIMATE ─────────────────────────────────────────────────────────────────
+function getTemp(){ return climate?climate.temp:manual.temp; }
+
+document.getElementById('loc-go').addEventListener('click',()=>fetchClimate(document.getElementById('loc-in').value));
+document.getElementById('loc-in').addEventListener('keydown',e=>{if(e.key==='Enter')fetchClimate(document.getElementById('loc-in').value);});
+document.getElementById('gps-btn').addEventListener('click',()=>{
+  if(!navigator.geolocation){notify('GPS','Not supported');return;}
+  notify('GPS','Getting position…');
+  navigator.geolocation.getCurrentPosition(p=>fetchClimateCoords(p.coords.latitude,p.coords.longitude),()=>notify('GPS','Permission denied'));
+});
+
+async function fetchClimate(q){
+  if(!q.trim())return;
+  const btn=document.getElementById('loc-go'); btn.disabled=true; btn.textContent='…';
+  try{
+    const r=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=1`);
+    const d=await r.json();
+    if(!d.results||!d.results.length){notify('Location','Not found');return;}
+    const{latitude,longitude,name,country}=d.results[0];
+    await fetchClimateCoords(latitude,longitude,name+', '+country);
+  }catch(e){notify('Error','Network failed');}
+  btn.disabled=false; btn.textContent='Fetch';
+}
+
+async function fetchClimateCoords(lat,lon,label){
+  try{
+    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,weather_code,uv_index,visibility,precipitation&wind_speed_unit=kmh&timezone=auto`);
+    const d=await r.json(); const c=d.current;
+    const condMap={0:'Clear sky',1:'Mostly clear',2:'Partly cloudy',3:'Overcast',45:'Foggy',48:'Icy fog',51:'Light drizzle',61:'Rain',71:'Snow',80:'Rain showers',95:'Thunderstorm'};
+    climate={
+      label:label||`${lat.toFixed(2)},${lon.toFixed(2)}`,
+      temp:Math.round(c.temperature_2m), feels:Math.round(c.apparent_temperature),
+      humidity:Math.round(c.relative_humidity_2m), wind:Math.round(c.wind_speed_10m),
+      uv:c.uv_index!=null?Math.round(c.uv_index):'—', visibility:c.visibility!=null?(c.visibility/1000).toFixed(1)+'km':'—',
+      code:c.weather_code, cond:condMap[c.weather_code]||'Mixed', precip:c.precipitation
+    };
+    // sync sliders
+    manual.temp=Math.min(50,Math.max(0,climate.temp));
+    manual.humidity=climate.humidity;
+    manual.wind=Math.min(80,climate.wind);
+    ['temp','humidity','wind'].forEach(k=>{
+      const el=document.getElementById('sr-'+k); if(el){el.value=manual[k]; document.getElementById('sv-'+k).textContent=sliderDefs.find(s=>s.id===k).fmt(manual[k]);}
+    });
+
+    // update topbar
+    document.getElementById('tp-loc').textContent=climate.label;
+    document.getElementById('tp-temp').textContent=climate.temp+'°C';
+    document.getElementById('tp-cond').textContent=climate.cond;
+
+    // update climate grid
+    const cg=document.getElementById('climate-grid');
+    const items=[
+      {label:'Temperature',val:climate.temp+'°C',cls:climate.temp>35?'hot':climate.temp<10?'cold':'',sub:'Real-time'},
+      {label:'Feels like',val:climate.feels+'°C',cls:'',sub:'Apparent'},
+      {label:'Humidity',val:climate.humidity+'%',cls:climate.humidity>80?'bad':'ok',sub:'Relative'},
+      {label:'Wind',val:climate.wind+' km/h',cls:'',sub:'Surface'},
+      {label:'UV index',val:climate.uv,cls:climate.uv>7?'bad':climate.uv>3?'':' ok',sub:'Current'},
+      {label:'Visibility',val:climate.visibility,cls:'',sub:'Surface'},
+    ];
+    cg.innerHTML=items.map(i=>`<div class="cc"><div class="cc-label">${i.label}</div><div class="cc-val ${i.cls}">${i.val}</div><div class="cc-sub">${i.sub}</div></div>`).join('');
+    document.getElementById('climate-sec').style.display='';
+
+    // apply to 3D scene
+    updateSkyFromClimate();
+    updateWeatherCanvas();
+    updateScores(); updateInsights();
+    notify('Climate loaded',climate.label+' · '+climate.temp+'°C, '+climate.cond);
+  }catch(e){notify('Climate error','Could not load data');}
+}
+
+// ─── THREE.JS SCENE ──────────────────────────────────────────────────────────
+let renderer, camera, threeScene, animReq;
+let cityGroup, layerGroup, particleSystem, sunLight, ambLight, hemiLight;
+let isDragging=false, prevMouse={x:0,y:0}, camTheta=0.6, camPhi=1.1, camRadius=80;
+let targetTheta=0.6, targetPhi=1.1;
+
+function initThree(){
+  const vp=document.getElementById('viewport');
+  renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.shadowMap.enabled=true;
+  renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  renderer.toneMapping=THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure=1.0;
+  renderer.setSize(vp.offsetWidth,vp.offsetHeight);
+  vp.appendChild(renderer.domElement);
+  renderer.domElement.style.position='absolute';
+  renderer.domElement.style.top='0';
+  renderer.domElement.style.left='0';
+  renderer.domElement.style.zIndex='1';
+
+  threeScene=new THREE.Scene();
+  threeScene.fog=new THREE.FogExp2(0x0a0c12,0.008);
+
+  camera=new THREE.PerspectiveCamera(55,vp.offsetWidth/vp.offsetHeight,0.1,1000);
+  camera.position.set(50,40,50);
+  camera.lookAt(0,0,0);
+
+  // Lights
+  ambLight=new THREE.AmbientLight(0x223355,0.8);
+  threeScene.add(ambLight);
+  hemiLight=new THREE.HemisphereLight(0x4488cc,0x112233,0.6);
+  threeScene.add(hemiLight);
+  sunLight=new THREE.DirectionalLight(0xfff4e0,2.5);
+  sunLight.position.set(60,80,40);
+  sunLight.castShadow=true;
+  sunLight.shadow.mapSize.width=2048; sunLight.shadow.mapSize.height=2048;
+  sunLight.shadow.camera.near=0.5; sunLight.shadow.camera.far=300;
+  sunLight.shadow.camera.left=-80; sunLight.shadow.camera.right=80;
+  sunLight.shadow.camera.top=80; sunLight.shadow.camera.bottom=-80;
+  threeScene.add(sunLight);
+
+  // Ground
+  const groundGeo=new THREE.PlaneGeometry(200,200,40,40);
+  const groundMat=new THREE.MeshLambertMaterial({color:0x111520});
+  const ground=new THREE.Mesh(groundGeo,groundMat);
+  ground.rotation.x=-Math.PI/2; ground.receiveShadow=true;
+  threeScene.add(ground);
+
+  // Road grid
+  buildRoads();
+
+  cityGroup=new THREE.Group(); threeScene.add(cityGroup);
+  layerGroup=new THREE.Group(); threeScene.add(layerGroup);
+
+  buildCity();
+  updateSunLight();
+
+  // Mouse orbit
+  renderer.domElement.addEventListener('mousedown',e=>{isDragging=true;prevMouse={x:e.clientX,y:e.clientY};});
+  window.addEventListener('mouseup',()=>isDragging=false);
+  window.addEventListener('mousemove',e=>{
+    if(!isDragging)return;
+    const dx=e.clientX-prevMouse.x, dy=e.clientY-prevMouse.y;
+    targetTheta+=dx*0.008; targetPhi=Math.max(0.15,Math.min(1.5,targetPhi+dy*0.008));
+    prevMouse={x:e.clientX,y:e.clientY};
+    autoRotate=false; document.getElementById('cb-rotate').classList.remove('active');
+  });
+  renderer.domElement.addEventListener('wheel',e=>{
+    camRadius=Math.max(15,Math.min(150,camRadius+e.deltaY*0.08));
+  });
+
+  window.addEventListener('resize',onResize);
+  animate();
+  setTimeout(()=>{document.getElementById('loading').classList.add('gone');},1500);
+}
+
+function buildRoads(){
+  const roadMat=new THREE.MeshLambertMaterial({color:0x161820});
+  // main roads
+  const roads=[
+    {w:8,l:200,x:0,z:0,ry:0},
+    {w:8,l:200,x:0,z:0,ry:Math.PI/2},
+    {w:5,l:200,x:25,z:0,ry:0},
+    {w:5,l:200,x:-25,z:0,ry:0},
+    {w:5,l:200,x:0,z:25,ry:Math.PI/2},
+    {w:5,l:200,x:0,z:-25,ry:Math.PI/2},
+  ];
+  roads.forEach(r=>{
+    const g=new THREE.PlaneGeometry(r.w,r.l);
+    const m=new THREE.Mesh(g,roadMat);
+    m.rotation.x=-Math.PI/2; m.rotation.z=r.ry;
+    m.position.set(r.x,0.01,r.z); m.receiveShadow=true;
+    threeScene.add(m);
+    // lane lines
+    const lineMat=new THREE.MeshBasicMaterial({color:0xffffff,opacity:0.15,transparent:true});
+    const lineG=new THREE.PlaneGeometry(0.15,r.l);
+    const line=new THREE.Mesh(lineG,lineMat);
+    line.rotation.x=-Math.PI/2; line.rotation.z=r.ry;
+    line.position.set(r.x,0.02,r.z); threeScene.add(line);
+  });
+}
+
+const buildingColors=[0x1e2535,0x232940,0x1a2030,0x252c42,0x1c2238,0x2a3050];
+const glassColors=[0x4488cc,0x3377bb,0x2266aa,0x55aadd];
+
+function buildCity(){
+  while(cityGroup.children.length) cityGroup.remove(cityGroup.children[0]);
+  const fl=manual.floors;
+  const blocks=[
+    // x, z, w, d, heightMult, type
+    [-40,-40,12,12,1.0,'office'],[-28,-40,8,8,0.6,'res'],[-15,-40,10,10,1.4,'tower'],
+    [-40,-25,8,10,0.7,'res'],[-28,-25,14,10,1.1,'office'],[-12,-25,9,9,0.9,'res'],
+    [-40,-10,10,8,0.5,'low'],[-25,-10,8,8,1.3,'tower'],[-12,-10,11,10,0.8,'office'],
+    [5,-40,12,10,1.0,'office'],[20,-40,8,8,0.5,'res'],[30,-40,10,12,1.2,'tower'],
+    [5,-25,9,9,0.8,'res'],[18,-25,12,10,1.5,'tower'],[32,-25,8,8,0.6,'low'],
+    [5,-10,11,10,0.7,'office'],[18,-10,9,9,1.0,'res'],[30,-10,12,10,1.3,'tower'],
+    [-40,10,8,12,0.9,'res'],[-28,10,12,8,1.1,'office'],[-12,10,9,10,0.6,'res'],
+    [-40,25,10,10,1.3,'tower'],[-25,25,8,8,0.7,'office'],[-12,25,11,10,1.0,'res'],
+    [5,10,12,10,0.8,'office'],[18,10,8,12,1.2,'tower'],[32,10,10,8,0.6,'res'],
+    [5,25,9,9,1.4,'tower'],[18,25,12,10,0.9,'office'],[32,25,8,8,0.7,'low'],
+  ];
+
+  blocks.forEach(([x,z,w,d,hm,type])=>{
+    const h=Math.max(3,(fl*hm*3));
+    const geo=new THREE.BoxGeometry(w,h,d);
+    const col=buildingColors[Math.floor(Math.random()*buildingColors.length)];
+    const mat=new THREE.MeshLambertMaterial({color:col});
+    const mesh=new THREE.Mesh(geo,mat);
+    mesh.position.set(x,h/2,z); mesh.castShadow=true; mesh.receiveShadow=true;
+    cityGroup.add(mesh);
+
+    // windows
+    const winMat=new THREE.MeshBasicMaterial({color:glassColors[Math.floor(Math.random()*glassColors.length)],opacity:0.6,transparent:true});
+    for(let fy=0;fy<Math.floor(h/3);fy++){
+      for(let fx=0;fx<Math.floor(w/3);fx++){
+        if(Math.random()<0.7){
+          const wg=new THREE.PlaneGeometry(1.2,1.5);
+          const wm=new THREE.Mesh(wg,winMat);
+          wm.position.set(x-w/2+fx*3+1.5,h*0.1+fy*3+1.5,z+d/2+0.01);
+          cityGroup.add(wm);
+        }
+      }
+    }
+
+    // rooftop details
+    if(type==='tower'){
+      const ag=new THREE.BoxGeometry(w*0.3,h*0.08,d*0.3);
+      const am=new THREE.Mesh(ag,new THREE.MeshLambertMaterial({color:0x334466}));
+      am.position.set(x,h+h*0.04,z); cityGroup.add(am);
+    }
+  });
+
+  // Add scenario-specific elements
+  addScenarioElements();
+  updateLayerMeshes();
+  updateScores(); updateInsights();
+}
+
+function addScenarioElements(){
+  // clear old scenario objects
+  const toRemove=cityGroup.children.filter(c=>c.userData.scenario);
+  toRemove.forEach(c=>cityGroup.remove(c));
+
+  if(scene3d==='flyover'){
+    // elevated road structure
+    const pillarMat=new THREE.MeshLambertMaterial({color:0x556677});
+    const deckMat=new THREE.MeshLambertMaterial({color:0x667788});
+    [-60,-30,0,30,60].forEach(px=>{
+      const pg=new THREE.BoxGeometry(2,15,2);
+      const pm=new THREE.Mesh(pg,pillarMat); pm.position.set(px,7.5,0); pm.userData.scenario=true; cityGroup.add(pm);
+    });
+    const dg=new THREE.BoxGeometry(140,2,10);
+    const dm=new THREE.Mesh(dg,deckMat); dm.position.set(0,16,0); dm.userData.scenario=true; cityGroup.add(dm);
+    // railings
+    const rg=new THREE.BoxGeometry(140,0.8,0.3);
+    const rm=new THREE.MeshLambertMaterial({color:0x889aaa});
+    [4.5,-4.5].forEach(rz=>{const r=new THREE.Mesh(rg,rm);r.position.set(0,17.4,rz);r.userData.scenario=true;cityGroup.add(r);});
+  }
+
+  if(scene3d==='brt'){
+    const brtMat=new THREE.MeshLambertMaterial({color:0x1a4a2a});
+    const bg=new THREE.BoxGeometry(140,0.3,5); const bm=new THREE.Mesh(bg,brtMat);
+    bm.position.set(0,0.15,-3); bm.userData.scenario=true; cityGroup.add(bm);
+    // BRT markers
+    for(let bx=-60;bx<=60;bx+=20){
+      const mg=new THREE.BoxGeometry(1,0.5,5);
+      const mm=new THREE.Mesh(mg,new THREE.MeshLambertMaterial({color:0x22aa55}));
+      mm.position.set(bx,0.4,-3); mm.userData.scenario=true; cityGroup.add(mm);
+    }
+    // Bus
+    const busGeo=new THREE.BoxGeometry(8,3.5,2.5);
+    const busMat=new THREE.MeshLambertMaterial({color:0xe8f5e9});
+    const bus=new THREE.Mesh(busGeo,busMat); bus.position.set(-50,2,-3); bus.userData.scenario=true; bus.userData.moving=true; cityGroup.add(bus);
+  }
+
+  if(scene3d==='park'){
+    const treeMat=new THREE.MeshLambertMaterial({color:0x1a5c30});
+    const trunkMat=new THREE.MeshLambertMaterial({color:0x4a3520});
+    [-30,-15,0,15,30].forEach(px=>{
+      [-30,-15,0,15,30].forEach(pz=>{
+        if(Math.abs(px)>5||Math.abs(pz)>5){
+          const h=4+Math.random()*4;
+          const tg=new THREE.ConeGeometry(2.5,h,7);
+          const tm=new THREE.Mesh(tg,treeMat); tm.position.set(px,h/2,pz); tm.userData.scenario=true; cityGroup.add(tm);
+          const trg=new THREE.CylinderGeometry(0.4,0.4,2,6);
+          const trm=new THREE.Mesh(trg,trunkMat); trm.position.set(px,1,pz); trm.userData.scenario=true; cityGroup.add(trm);
+        }
+      });
+    });
+    // grass plane
+    const gg=new THREE.PlaneGeometry(70,70);
+    const gm=new THREE.Mesh(gg,new THREE.MeshLambertMaterial({color:0x1a4a20,opacity:0.8,transparent:true}));
+    gm.rotation.x=-Math.PI/2; gm.position.set(0,0.05,0); gm.userData.scenario=true; cityGroup.add(gm);
+  }
+
+  if(scene3d==='metro'){
+    // underground entrance boxes
+    const entMat=new THREE.MeshLambertMaterial({color:0x334455});
+    [[-10,10],[10,10],[-10,-10],[10,-10]].forEach(([ex,ez])=>{
+      const eg=new THREE.BoxGeometry(6,4,6);
+      const em=new THREE.Mesh(eg,entMat); em.position.set(ex,2,ez); em.userData.scenario=true; cityGroup.add(em);
+      const signG=new THREE.BoxGeometry(4,2,0.3);
+      const signM=new THREE.Mesh(signG,new THREE.MeshLambertMaterial({color:0x2255cc}));
+      signM.position.set(ex,4.5,ez+3.1); signM.userData.scenario=true; cityGroup.add(signM);
+    });
+    // tunnel outline on ground
+    const tg=new THREE.PlaneGeometry(6,60);
+    const tm=new THREE.Mesh(tg,new THREE.MeshLambertMaterial({color:0x223344,opacity:0.8,transparent:true}));
+    tm.rotation.x=-Math.PI/2; tm.position.set(0,0.03,0); tm.userData.scenario=true; cityGroup.add(tm);
+  }
+
+  if(scene3d==='highrise'){
+    // Extra tall towers
+    const hrMat=new THREE.MeshLambertMaterial({color:0x1e2840});
+    [[0,0,14,14,50],[-20,0,10,10,38],[20,0,10,10,42],[0,-20,12,12,45],[0,20,12,12,40]].forEach(([x,z,w,d,h])=>{
+      const g=new THREE.BoxGeometry(w,h,d);
+      const m=new THREE.Mesh(g,hrMat); m.position.set(x,h/2,z); m.castShadow=true; m.userData.scenario=true; cityGroup.add(m);
+      // glass curtain
+      const gmat=new THREE.MeshLambertMaterial({color:0x4499cc,opacity:0.4,transparent:true});
+      const gg=new THREE.BoxGeometry(w+0.2,h,d+0.2);
+      const gm=new THREE.Mesh(gg,gmat); gm.position.set(x,h/2,z); gm.userData.scenario=true; cityGroup.add(gm);
+    });
+  }
+}
+
+// ─── LAYER MESHES ────────────────────────────────────────────────────────────
+function updateLayerMeshes(){
+  while(layerGroup.children.length) layerGroup.remove(layerGroup.children[0]);
+
+  if(layers.heat){
+    const temp=getTemp();
+    const a=Math.max(0,(temp-20)/50)*0.5;
+    const col=temp>35?0xff6600:temp>25?0xffaa00:0x4488ff;
+    const geo=new THREE.PlaneGeometry(120,120,20,20);
+    const mat=new THREE.MeshBasicMaterial({color:col,opacity:a,transparent:true,side:THREE.DoubleSide,depthWrite:false});
+    const m=new THREE.Mesh(geo,mat); m.rotation.x=-Math.PI/2; m.position.y=0.5; layerGroup.add(m);
+    // heat columns over dense areas
+    [[0,0],[20,20],[-20,-20],[15,-15],[-15,15]].forEach(([x,z])=>{
+      const h=8+temp*0.3;
+      const cg=new THREE.CylinderGeometry(6,8,h,12);
+      const cm=new THREE.Mesh(cg,new THREE.MeshBasicMaterial({color:col,opacity:0.15,transparent:true,depthWrite:false}));
+      cm.position.set(x,h/2,z); layerGroup.add(cm);
+    });
+  }
+
+  if(layers.traffic){
+    const t=manual.traffic;
+    const col=t>70?0xff2244:t>40?0xff8800:0x44ff88;
+    [-4,-1.5,1.5,4].forEach(lane=>{
+      const geo=new THREE.PlaneGeometry(140,1.5);
+      const mat=new THREE.MeshBasicMaterial({color:col,opacity:t/300,transparent:true,depthWrite:false});
+      const m=new THREE.Mesh(geo,mat); m.rotation.x=-Math.PI/2; m.position.set(0,0.08,lane); layerGroup.add(m);
+    });
+    // animated cars as spheres
+    for(let i=0;i<Math.round(t/10);i++){
+      const cg=new THREE.SphereGeometry(1,6,6);
+      const cm=new THREE.Mesh(cg,new THREE.MeshBasicMaterial({color:col}));
+      cm.position.set(-70+i*16,1,[-3.5,-1,1.5,3][i%4]);
+      cm.userData.car=true; cm.userData.lane=i%4; cm.userData.phase=i*0.3;
+      layerGroup.add(cm);
+    }
+  }
+
+  if(layers.isovist){
+    [0,25,-25].forEach((offset,i)=>{
+      [1,2,3].forEach(ring=>{
+        const geo=new THREE.RingGeometry(ring*10-1,ring*10,36);
+        const mat=new THREE.MeshBasicMaterial({color:0x4f9eff,opacity:0.15-ring*0.03,transparent:true,side:THREE.DoubleSide,depthWrite:false});
+        const m=new THREE.Mesh(geo,mat); m.rotation.x=-Math.PI/2; m.position.set(offset,0.2,offset); layerGroup.add(m);
+      });
+    });
+  }
+
+  if(layers.daylight){
+    const hour=(manual.time*10/60)%24;
+    const sunX=Math.cos((hour-6)/18*Math.PI)*80;
+    const sunY=40+Math.sin((hour-6)/18*Math.PI)*20;
+    const sunZ=-40;
+    const geo=new THREE.SphereGeometry(4,16,16);
+    const mat=new THREE.MeshBasicMaterial({color:hour>6&&hour<20?0xffd040:0x334466});
+    const sun=new THREE.Mesh(geo,mat); sun.position.set(sunX,sunY,sunZ); layerGroup.add(sun);
+    // shadow planes
+    cityGroup.children.filter(c=>!c.userData.scenario).forEach(b=>{
+      if(!b.geometry) return;
+      const shadowLen=manual.floors*2;
+      const sg=new THREE.PlaneGeometry(b.geometry.parameters.width||4,shadowLen);
+      const sm=new THREE.Mesh(sg,new THREE.MeshBasicMaterial({color:0x000011,opacity:0.3,transparent:true,depthWrite:false}));
+      sm.rotation.x=-Math.PI/2; sm.position.set(b.position.x,0.06,b.position.z+shadowLen/2); layerGroup.add(sm);
+    });
+  }
+
+  if(layers.air){
+    const t=manual.traffic; const temp=getTemp();
+    const aqi=t*0.5+Math.max(0,temp-25)*0.8;
+    const col=aqi<40?0x00cc66:aqi<80?0xcccc00:0xff4400;
+    for(let i=0;i<80;i++){
+      const x=(Math.random()-0.5)*100, z=(Math.random()-0.5)*100;
+      const h=Math.random()*20;
+      const geo=new THREE.SphereGeometry(1.5+Math.random()*3,5,5);
+      const mat=new THREE.MeshBasicMaterial({color:col,opacity:0.08+Math.random()*0.1,transparent:true,depthWrite:false});
+      const m=new THREE.Mesh(geo,mat); m.position.set(x,h,z); layerGroup.add(m);
+    }
+  }
+
+  if(layers.space){
+    for(let x=-50;x<=50;x+=12){
+      for(let z=-50;z<=50;z+=12){
+        const isRoad=Math.abs(x)<5||Math.abs(z)<5;
+        const int=isRoad?0.4:0.1+Math.random()*0.25;
+        const geo=new THREE.PlaneGeometry(10,10);
+        const mat=new THREE.MeshBasicMaterial({color:0xb06aff,opacity:int*0.4,transparent:true,depthWrite:false});
+        const m=new THREE.Mesh(geo,mat); m.rotation.x=-Math.PI/2; m.position.set(x,0.04,z); layerGroup.add(m);
+      }
+    }
+  }
+
+  if(layers.noise){
+    const t=manual.traffic;
+    [15,30,45,60,75].forEach((r,i)=>{
+      const geo=new THREE.RingGeometry(r-0.5,r+0.5,48);
+      const mat=new THREE.MeshBasicMaterial({color:0xf0997b,opacity:Math.max(0,0.3-i*0.04)*t/100,transparent:true,side:THREE.DoubleSide,depthWrite:false});
+      const m=new THREE.Mesh(geo,mat); m.rotation.x=-Math.PI/2; m.position.set(0,0.15,0); layerGroup.add(m);
+    });
+  }
+
+  if(layers.access){
+    const blocked=scene3d==='flyover'||scene3d==='highrise';
+    const col=blocked?0xff4f6a:0x2dffaa;
+    // pedestrian paths
+    [[-3,0],[3,0],[0,-3],[0,3]].forEach(([ox,oz])=>{
+      const geo=new THREE.PlaneGeometry(2,100);
+      const mat=new THREE.MeshBasicMaterial({color:col,opacity:0.4,transparent:true,depthWrite:false});
+      const m=new THREE.Mesh(geo,mat); m.rotation.x=-Math.PI/2; m.position.set(ox,0.06,oz); layerGroup.add(m);
+    });
+    if(blocked){
+      const xMat=new THREE.LineBasicMaterial({color:0xff4f6a,opacity:0.8,transparent:true});
+      const xGeo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-10,1,-10),new THREE.Vector3(10,1,10)]);
+      const xGeo2=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(10,1,-10),new THREE.Vector3(-10,1,10)]);
+      layerGroup.add(new THREE.Line(xGeo,xMat)); layerGroup.add(new THREE.Line(xGeo2,xMat));
+    }
+  }
+}
+
+// ─── SUN / SKY ───────────────────────────────────────────────────────────────
+function updateSunLight(){
+  const hour=(manual.time*10/60)%24;
+  const angle=(hour-6)/18*Math.PI;
+  const sx=Math.cos(angle)*80, sy=Math.max(5,Math.sin(angle)*70), sz=-40;
+  sunLight.position.set(sx,sy,sz);
+  const isDay=hour>=6&&hour<=20;
+  const isDawn=hour<8||hour>18;
+  if(!isDay){ sunLight.intensity=0.1; ambLight.intensity=0.2; hemiLight.intensity=0.1; threeScene.fog.color.set(0x050810); }
+  else if(isDawn){ sunLight.color.set(0xff9944); sunLight.intensity=1.2; ambLight.intensity=0.5; threeScene.fog.color.set(0x1a1a2e); }
+  else{ sunLight.color.set(0xfff4e0); sunLight.intensity=2.2; ambLight.intensity=0.8; threeScene.fog.color.set(0x0a0c14); }
+  if(nightMode){ sunLight.intensity*=0.1; ambLight.intensity=0.15; threeScene.fog.color.set(0x020306); }
+  document.getElementById('tp-time').textContent=sliderDefs.find(s=>s.id==='time').fmt(manual.time);
+}
+
+function updateSkyFromClimate(){
+  if(!climate)return;
+  updateSunLight();
+  if(climate.code>=45&&climate.code<50){ threeScene.fog.density=0.025; threeScene.fog.color.set(0x8899aa); }
+  else if(climate.code>=61&&climate.code<80){ threeScene.fog.density=0.012; threeScene.fog.color.set(0x334455); }
+  else if(climate.code>=95){ threeScene.fog.density=0.018; threeScene.fog.color.set(0x111122); }
+  else{ threeScene.fog.density=0.007; }
+}
+
+// ─── WEATHER CANVAS ───────────────────────────────────────────────────────────
+let wctx, wCanvas, rainDrops=[], snowFlakes=[];
+function initWeatherCanvas(){
+  wCanvas=document.getElementById('weather-canvas');
+  wctx=wCanvas.getContext('2d');
+  resizeWeatherCanvas();
+}
+function resizeWeatherCanvas(){
+  const vp=document.getElementById('viewport');
+  wCanvas.width=vp.offsetWidth; wCanvas.height=vp.offsetHeight;
+}
+function updateWeatherCanvas(){
+  if(!climate)return;
+  rainDrops=[]; snowFlakes=[];
+  if(climate.code>=61&&climate.code<80){
+    for(let i=0;i<200;i++) rainDrops.push({x:Math.random()*wCanvas.width,y:Math.random()*wCanvas.height,speed:6+Math.random()*8,len:10+Math.random()*15});
+  }
+  if(climate.code>=71&&climate.code<78){
+    for(let i=0;i<120;i++) snowFlakes.push({x:Math.random()*wCanvas.width,y:Math.random()*wCanvas.height,r:1+Math.random()*2.5,speed:0.5+Math.random()*1.5,drift:Math.random()*0.5-0.25});
+  }
+}
+function drawWeather(){
+  wctx.clearRect(0,0,wCanvas.width,wCanvas.height);
+  if(!climate)return;
+  const wind=climate.wind||manual.wind;
+  if(rainDrops.length){
+    wctx.strokeStyle='rgba(150,190,255,0.45)'; wctx.lineWidth=1.2;
+    rainDrops.forEach(d=>{
+      wctx.beginPath(); wctx.moveTo(d.x,d.y); wctx.lineTo(d.x+wind*0.3,d.y+d.len); wctx.stroke();
+      d.y+=d.speed; d.x+=wind*0.1;
+      if(d.y>wCanvas.height){d.y=0;d.x=Math.random()*wCanvas.width;}
+      if(d.x>wCanvas.width){d.x=0;}
+    });
+  }
+  if(snowFlakes.length){
+    wctx.fillStyle='rgba(220,235,255,0.7)';
+    snowFlakes.forEach(f=>{
+      wctx.beginPath(); wctx.arc(f.x,f.y,f.r,0,Math.PI*2); wctx.fill();
+      f.y+=f.speed; f.x+=f.drift;
+      if(f.y>wCanvas.height){f.y=0;f.x=Math.random()*wCanvas.width;}
+    });
+  }
+  if(climate.code>=95&&Math.random()<0.005){
+    wctx.strokeStyle='rgba(255,255,180,0.8)'; wctx.lineWidth=2;
+    const lx=Math.random()*wCanvas.width;
+    wctx.beginPath(); wctx.moveTo(lx,0); wctx.lineTo(lx+30,wCanvas.height*0.4); wctx.lineTo(lx+15,wCanvas.height*0.4); wctx.lineTo(lx+45,wCanvas.height); wctx.stroke();
+  }
+  // fog overlay
+  if(climate.code>=45&&climate.code<50){
+    wctx.fillStyle='rgba(180,200,210,0.18)'; wctx.fillRect(0,0,wCanvas.width,wCanvas.height);
+  }
+}
+
+// ─── ANIMATION ───────────────────────────────────────────────────────────────
+let tick3d=0;
+function animate(){
+  animReq=requestAnimationFrame(animate);
+  tick3d++;
+
+  // smooth camera
+  if(autoRotate) targetTheta+=0.003;
+  camTheta+=(targetTheta-camTheta)*0.05;
+  camPhi+=(targetPhi-camPhi)*0.05;
+  const r=camRadius;
+  camera.position.set(r*Math.sin(camTheta)*Math.cos(camPhi),r*Math.sin(camPhi),r*Math.cos(camTheta)*Math.cos(camPhi));
+  camera.lookAt(0,5,0);
+
+  // animate traffic cars
+  layerGroup.children.filter(c=>c.userData.car).forEach(c=>{
+    c.position.x=((-70+tick3d*(0.5+c.userData.lane*0.15)+c.userData.phase*20)%150)-75;
+  });
+
+  // animate BRT bus
+  const bus=cityGroup.children.find(c=>c.userData.moving);
+  if(bus) bus.position.x=((-70+tick3d*0.8)%160)-80;
+
+  // time auto-advance
+  if(tick3d%300===0&&!climate){
+    manual.time=Math.min(143,manual.time+1);
+    const sl=document.getElementById('sr-time'); if(sl){sl.value=manual.time;document.getElementById('sv-time').textContent=sliderDefs.find(s=>s.id==='time').fmt(manual.time);}
+    updateSunLight();
+  }
+
+  drawWeather();
+  renderer.render(threeScene,camera);
+}
+
+// ─── CONTROLS ────────────────────────────────────────────────────────────────
+document.getElementById('cb-rotate').addEventListener('click',()=>{
+  autoRotate=!autoRotate;
+  document.getElementById('cb-rotate').classList.toggle('active',autoRotate);
+});
+document.getElementById('cb-top').addEventListener('click',()=>{
+  autoRotate=false; document.getElementById('cb-rotate').classList.remove('active');
+  targetPhi=1.49; targetTheta=0; camRadius=100;
+});
+document.getElementById('cb-street').addEventListener('click',()=>{
+  autoRotate=false; document.getElementById('cb-rotate').classList.remove('active');
+  targetPhi=0.18; camRadius=30;
+});
+document.getElementById('cb-iso').addEventListener('click',()=>{
+  autoRotate=false; document.getElementById('cb-rotate').classList.remove('active');
+  targetTheta=0.785; targetPhi=0.785; camRadius=90;
+});
+document.getElementById('cb-night').addEventListener('click',()=>{
+  nightMode=!nightMode;
+  document.getElementById('cb-night').classList.toggle('active',nightMode);
+  updateSunLight();
+});
+
+// ─── SCENARIOS ───────────────────────────────────────────────────────────────
+document.querySelectorAll('.sbtn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.sbtn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    scene3d=btn.dataset.scene;
+    document.getElementById('hud-scene').textContent=scene3d.toUpperCase().replace('-',' ');
+    rebuildCity();
+  });
+});
+
+function rebuildCity(){
+  buildCity();
+  updateLayerMeshes();
+  updateScores(); updateInsights();
+}
+
+// ─── RESIZE ───────────────────────────────────────────────────────────────────
+function onResize(){
+  const vp=document.getElementById('viewport');
+  camera.aspect=vp.offsetWidth/vp.offsetHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(vp.offsetWidth,vp.offsetHeight);
+  resizeWeatherCanvas();
+}
+
+// ─── EXPORT ──────────────────────────────────────────────────────────────────
+function exportFrame(){
+  renderer.render(threeScene,camera);
+  const url=renderer.domElement.toDataURL('image/png');
+  const a=document.createElement('a'); a.href=url; a.download='urban3d-frame.png'; a.click();
+  notify('Exported','3D frame saved as PNG');
+}
+
+// ─── ANALYSIS ────────────────────────────────────────────────────────────────
+function triggerAnalysis(){
+  const s=calcScores();
+  const loc=climate?climate.label:'unspecified location';
+  const temp=getTemp(); const cond=climate?climate.cond:'manual mode';
+  const msg=`3D Urban simulation analysis — Scenario: ${scene3d}, Location: ${loc}, Temperature: ${temp}°C, Weather: ${cond}, Traffic: ${manual.traffic}%, Building floors: ${manual.floors}, Humidity: ${getEffH()}%, Wind: ${getEffW()} km/h, Walkability: ${s.walk}, Thermal stress: ${s.heat}, Air quality index: ${s.air}, Solar access: ${s.solar}, Noise level: ${s.noise}, Pedestrian comfort: ${s.comfort}. Active analysis layers: ${Object.keys(layers).filter(k=>layers[k]).join(', ')||'none'}. Please give detailed urban design recommendations.`;
+  if(typeof sendPrompt==='function') sendPrompt(msg);
+  else { const ta=document.createElement('textarea'); ta.value=msg; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); notify('Copied','Analysis prompt copied to clipboard'); }
+}
+function getEffH(){ return climate?climate.humidity:manual.humidity; }
+function getEffW(){ return climate?climate.wind:manual.wind; }
+
+// ─── NOTIFY ───────────────────────────────────────────────────────────────────
+function notify(title,body){
+  document.getElementById('ntitle').textContent=title;
+  document.getElementById('nbody').textContent=body;
+  const n=document.getElementById('notif'); n.classList.add('show');
+  setTimeout(()=>n.classList.remove('show'),3000);
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+initWeatherCanvas();
+initThree();
+updateScores();
+updateInsights();
+
+// Update HUD every second for live clock
+setInterval(()=>{
+  const now=new Date();
+  document.getElementById('tp-time').textContent=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
+  if(climate){
+    document.getElementById('hud-wx').textContent=climate.temp+'°C · '+climate.cond+' · Wind '+climate.wind+'km/h';
+    document.getElementById('hud-loc').textContent=climate.label;
+  }
+},1000);
+</script>
+</body>
+</html>
